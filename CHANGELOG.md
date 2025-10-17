@@ -1,3 +1,10 @@
+## 1.0.1
+
+### Bug Fixes
+- Fix pub.dev publish requirements
+- Remove unnecessary `@protected` annotations from platform interface
+- Remove unnecessary imports
+
 ## 1.0.0
 
 ### 🎉 Major Release: Package Rename & Architecture Refinement

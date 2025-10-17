@@ -2,7 +2,7 @@
 # Run `pod lib lint audio_router.podspec` to validate before publishing.
 Pod::Spec.new do |s|
   s.name             = 'audio_router'
-  s.version          = '1.0.0'
+  s.version          = '1.0.1'
   s.summary          = 'Flutter plugin for managing audio output routing.'
   s.description      = <<-DESC
 Audio Router exposes native audio route selection UI and device state updates for VoIP and communication apps.
