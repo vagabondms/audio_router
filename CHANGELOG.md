@@ -1,3 +1,13 @@
+## 1.0.2
+
+### Documentation
+- Improved README with beginner-friendly language and better structure
+- Added Quick Start section for immediate usage
+- Added Troubleshooting section with common issues
+- Clarified that media apps can use `.media()` option for full device support
+- Added personal project disclaimer
+- Reduced verbosity while maintaining technical accuracy (19% shorter)
+
 ## 1.0.1
 
 ### Bug Fixes

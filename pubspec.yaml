@@ -1,6 +1,6 @@
 name: audio_router
-description: "Flutter plugin for managing audio output routing in VoIP and communication apps. Provides native UI for switching between speaker, receiver, Bluetooth, wired headsets, and other audio devices."
-version: 1.0.1
+description: "Flutter plugin for audio output routing. Switch between speaker, receiver, Bluetooth, and other devices with native UI. Supports both VoIP and media playback apps."
+version: 1.0.2
 homepage: https://github.com/vagabondms/audio_router
 
 environment:
