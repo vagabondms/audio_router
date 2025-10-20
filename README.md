@@ -2,6 +2,8 @@
 
 A Flutter plugin for managing audio output in VoIP and communication apps. Switch between speaker, receiver, Bluetooth, and other audio devices with native UI.
 
+> **Note:** This plugin was created for my personal projects, but feel free to use it if it fits your needs. If you encounter any issues, please report them in the [Issues](https://github.com/vagabondms/audio_router/issues) section and I'll take a look when I have time.
+
 ## Quick Start
 
 ```dart
