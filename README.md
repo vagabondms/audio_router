@@ -1,288 +1,244 @@
 # Audio Router
 
-A Flutter plugin for controlling audio output routing on iOS and Android. **Optimized for managing audio routing during calls in VoIP applications.**
+A Flutter plugin for managing audio output in VoIP and communication apps. Switch between speaker, receiver, Bluetooth, and other audio devices with native UI.
 
-## Purpose
+## Quick Start
 
-This plugin is designed to **control audio output devices (routes) within an existing audio session**:
+```dart
+import 'package:audio_router/audio_router.dart';
 
-- **Native audio routing UI**: iOS uses system AVRoutePickerView, Android uses Material Design 3 Dialog
-- **Multi-device support**: Built-in speaker, receiver, Bluetooth, wired headsets, car audio (iOS), AirPlay (iOS), etc.
-- **Real-time device detection**: Detects audio device connections/disconnections in real-time and provides state streams
+final audioRouter = AudioRouter();
 
-### 🔴 Important: Audio Session Management is Your App's Responsibility
+// Show audio device picker
+await audioRouter.showAudioRoutePicker(context);
 
-**This plugin does NOT configure audio sessions.** The host app must first set up the appropriate audio session:
+// Listen to device changes
+audioRouter.currentDeviceStream.listen((device) {
+  print('Now using: ${device?.type}');
+});
+```
 
-- **Android**: `AudioManager.setMode(MODE_IN_COMMUNICATION)` or `MODE_IN_CALL`
-- **iOS**: `AVAudioSession.setCategory(.playAndRecord, mode: .voiceChat)` or `.videoChat`
+## What is Audio Router?
 
-See the [Usage](#usage) section for detailed setup instructions.
+This plugin helps you **manage audio output devices during calls**. It provides:
+
+- **Native UI** for choosing audio devices (iOS system picker, Android Material Design dialog)
+- **Real-time monitoring** of which device is currently active
+- **Automatic detection** when devices are connected or disconnected
+
+### Important: You Setup Audio Session, We Handle Routing
+
+This plugin **does NOT configure audio sessions**. Your app must first set up the audio session:
+
+- **Android**: Set `AudioManager.MODE_IN_COMMUNICATION` for VoIP calls
+- **iOS**: Set `AVAudioSession` category to `.playAndRecord` with `.voiceChat` mode
+
+Think of it this way: You tell the system "I'm making a call" (audio session), then this plugin lets users choose "where the sound comes out" (audio routing).
 
 ## Features
 
-### Audio Routing
+- **Native device picker UI** that matches each platform's design
+- **Real-time device monitoring** via streams
+- **Automatic device detection** when plugging/unplugging devices
+- **Smart filtering** on Android (shows only call-compatible devices by default)
 
-- **Native audio device picker UI**
-  - iOS: System `AVRoutePickerView` (AirPlay style)
-  - Android: Material Design 3 Dialog
-- Real-time monitoring of currently selected device
-- Automatic device switching detection
+### Platform-Specific
 
-### Device Detection and Monitoring
+**iOS**
+- Uses Apple's system picker (`AVRoutePickerView`)
+- Supports AirPlay and CarPlay
+- Automatic device management by the system
 
-- Provides audio state change streams
-- Real-time detection of device connections/disconnections
-- Provides current active device information
+**Android**
+- Material Design 3 dialog
+- Filters devices for communication by default (SCO Bluetooth, USB headsets)
+- Can switch to media mode for A2DP Bluetooth if needed
 
-### iOS-Specific Features
+## Best Used For
 
-- **System native AVRoutePickerView**
-- AVAudioSession-based automatic routing
-- AirPlay, CarPlay support
+✅ **VoIP and Communication Apps (Default)**
+- VoIP calls (Zoom, WhatsApp, etc.)
+- Voice/video chat apps
+- Real-time communication
+- Uses `communication` mode by default (filters for call-compatible devices)
 
-### Android-Specific Features
-
-- **Material Design 3 Dialog**
-- AudioManager-based device management
-- Real-time device list updates
-- **Communication device filtering**: Automatically excludes A2DP (music-only), USB_DEVICE/ACCESSORY (general USB)
-
-## Recommended Use Cases
-
-This plugin is optimized for **communication apps**:
-
-- ✅ **Recommended**: VoIP calls, voice/video chat, real-time communication apps
-- ⚠️ **Caution**: May not be suitable for media playback apps like music players, games, or video viewers
-  - Android filters to show only communication devices (SCO Bluetooth, USB Headset)
-  - A2DP Bluetooth and general USB devices are not shown in the list
+✅ **Media Playback Apps (Use `.media()` option)**
+- Music players, games, video apps
+- Any app that needs A2DP Bluetooth or all USB devices
+- Use `AndroidAudioOptions.media()` to include all audio devices
 
 ## Installation
 
-Add the dependency to your `pubspec.yaml` file:
+Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  audio_router: ^1.0.0
+  audio_router: ^1.0.1
+```
+
+Run:
+```bash
+flutter pub get
 ```
 
 ## Usage
 
-### 1. Audio Session Setup (Required)
+### Step 1: Setup Audio Session (Required First!)
 
-Before using this plugin, the host app must first set up the audio session.
+Before using the plugin, configure your audio session. This tells the OS "we're making a call".
 
-#### Android
+#### Android Setup
 
-Set the AudioManager mode before starting a call:
-
-```kotlin
-// MainActivity.kt or when starting a call
-import android.media.AudioManager
-import android.content.Context
-
-val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-audioManager.mode = AudioManager.MODE_IN_COMMUNICATION  // For VoIP calls
-// or
-// audioManager.mode = AudioManager.MODE_IN_CALL  // For regular calls
-```
-
-**Setting up via Flutter platform channel:**
+**Option A: Via Platform Channel (Recommended)**
 
 ```dart
-// Set Android audio mode
-static const platform = MethodChannel('your_app/audio');
+// Dart code
+import 'package:flutter/services.dart';
+import 'dart:io';
 
-Future<void> setupAudioSession() async {
+Future<void> setupAudioForCall() async {
   if (Platform.isAndroid) {
-    await platform.invokeMethod('setAudioMode', {'mode': 'communication'});
+    const platform = MethodChannel('your_app/audio');
+    await platform.invokeMethod('setAudioMode');
   }
 }
 ```
 
 ```kotlin
-// Android native code (MainActivity.kt)
-MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "your_app/audio")
-  .setMethodCallHandler { call, result ->
-    if (call.method == "setAudioMode") {
-      val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-      audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
-      result.success(null)
-    }
+// MainActivity.kt
+import android.media.AudioManager
+import io.flutter.embedding.android.FlutterActivity
+import io.flutter.plugin.common.MethodChannel
+
+class MainActivity: FlutterActivity() {
+  override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+    super.configureFlutterEngine(flutterEngine)
+
+    MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "your_app/audio")
+      .setMethodCallHandler { call, result ->
+        if (call.method == "setAudioMode") {
+          val audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
+          audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+          result.success(null)
+        }
+      }
   }
-```
-
-#### iOS
-
-Set up AVAudioSession at app startup or before a call:
-
-```swift
-// AppDelegate.swift or when starting a call
-import AVFoundation
-
-do {
-    let audioSession = AVAudioSession.sharedInstance()
-    try audioSession.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetooth])
-    try audioSession.setActive(true)
-} catch {
-    print("Failed to set up audio session: \(error)")
 }
 ```
 
-**Setting up via Flutter platform channel:**
+#### iOS Setup
+
+**Option A: Via Platform Channel (Recommended)**
 
 ```dart
-// Set iOS audio session
-static const platform = MethodChannel('your_app/audio');
+// Dart code
+import 'package:flutter/services.dart';
+import 'dart:io';
 
-Future<void> setupAudioSession() async {
+Future<void> setupAudioForCall() async {
   if (Platform.isIOS) {
+    const platform = MethodChannel('your_app/audio');
     await platform.invokeMethod('setupAudioSession');
   }
 }
 ```
 
 ```swift
-// iOS native code (AppDelegate.swift)
-let channel = FlutterMethodChannel(name: "your_app/audio", binaryMessenger: controller.binaryMessenger)
-channel.setMethodCallHandler { (call, result) in
-    if call.method == "setupAudioSession" {
+// AppDelegate.swift
+import AVFoundation
+import Flutter
+
+@main
+@objc class AppDelegate: FlutterAppDelegate {
+  override func application(
+    _ application: UIApplication,
+    didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
+  ) -> Bool {
+    let controller = window?.rootViewController as! FlutterViewController
+    let channel = FlutterMethodChannel(
+      name: "your_app/audio",
+      binaryMessenger: controller.binaryMessenger
+    )
+
+    channel.setMethodCallHandler { (call, result) in
+      if call.method == "setupAudioSession" {
         do {
-            let audioSession = AVAudioSession.sharedInstance()
-            try audioSession.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetooth])
-            try audioSession.setActive(true)
-            result(nil)
+          let session = AVAudioSession.sharedInstance()
+          try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetooth])
+          try session.setActive(true)
+          result(nil)
         } catch {
-            result(FlutterError(code: "AUDIO_SESSION_ERROR", message: error.localizedDescription, details: nil))
+          result(FlutterError(code: "ERROR", message: error.localizedDescription, details: nil))
         }
+      }
     }
+
+    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
 }
 ```
 
-### 2. Plugin Initialization
+### Step 2: Use Audio Router
 
 ```dart
 import 'package:audio_router/audio_router.dart';
 
 final audioRouter = AudioRouter();
+
+// Show device picker
+await audioRouter.showAudioRoutePicker(context);
+
+// Monitor current device
+audioRouter.currentDeviceStream.listen((device) {
+  print('Current device: ${device?.type}');
+});
 ```
 
-### 3. Show Audio Device Picker UI
+### Step 3: (Android Only) Customize Device Filtering
 
-#### Basic Usage (VoIP/Communication Apps)
-
-```dart
-// Show native audio routing picker
-// iOS: System AVRoutePickerView
-// Android: Material Design 3 Dialog (shows communication devices only)
-await audioRouter.showAudioRoutePicker(context);
-```
-
-#### Customizing Android Device Filters
-
-On Android, you can use the `androidOptions` parameter to control which device types are displayed:
+By default, Android shows only communication devices. For music apps, use media mode:
 
 ```dart
-// For communication apps (default) - SCO Bluetooth, USB Headset only
+// For VoIP/calls (default)
 await audioRouter.showAudioRoutePicker(context);
-// Or explicitly
-await audioRouter.showAudioRoutePicker(
-  context,
-  androidOptions: AndroidAudioOptions.communication(),
-);
 
-// For media playback apps - includes A2DP Bluetooth, all USB devices
+// For music/media playback
 await audioRouter.showAudioRoutePicker(
   context,
   androidOptions: AndroidAudioOptions.media(),
 );
 
-// Show all devices (debugging/special purposes)
+// Show all devices
 await audioRouter.showAudioRoutePicker(
   context,
   androidOptions: AndroidAudioOptions.all(),
 );
-
-// Or specify filter directly
-await audioRouter.showAudioRoutePicker(
-  context,
-  androidOptions: AndroidAudioOptions(
-    filter: AndroidAudioDeviceFilter.media,
-  ),
-);
 ```
 
-**`androidOptions` is ignored on iOS.** iOS automatically filters appropriate devices through the system.
+**Note:** `androidOptions` is ignored on iOS.
 
-### 4. Monitor Currently Selected Device
-
-```dart
-// Real-time device change detection
-audioRouter.currentDeviceStream.listen((device) {
-  if (device != null) {
-    print('Current device: ${device.type}');
-    print('Device ID: ${device.id}');
-  }
-});
-```
-
-### 5. Complete Integration Example
+### Complete Example
 
 ```dart
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:audio_router/audio_router.dart';
+import 'dart:async';
 
-class VoIPCallPage extends StatefulWidget {
+class CallScreen extends StatefulWidget {
   @override
-  State<VoIPCallPage> createState() => _VoIPCallPageState();
+  State<CallScreen> createState() => _CallScreenState();
 }
 
-class _VoIPCallPageState extends State<VoIPCallPage> {
-  static const platform = MethodChannel('your_app/audio');
+class _CallScreenState extends State<CallScreen> {
   final _audioRouter = AudioRouter();
   StreamSubscription<AudioDevice?>? _subscription;
   AudioDevice? _currentDevice;
-  bool _audioSessionConfigured = false;
 
   @override
   void initState() {
     super.initState();
-    _setupAudioSessionAndMonitoring();
-  }
-
-  Future<void> _setupAudioSessionAndMonitoring() async {
-    // 1. First set up audio session (required!)
-    await _setupAudioSession();
-
-    // 2. Then start audio routing monitoring
-    _initAudioMonitoring();
-  }
-
-  Future<void> _setupAudioSession() async {
-    try {
-      if (Platform.isAndroid) {
-        // Android: Set AudioManager mode
-        await platform.invokeMethod('setAudioMode', {'mode': 'communication'});
-      } else if (Platform.isIOS) {
-        // iOS: Set AVAudioSession
-        await platform.invokeMethod('setupAudioSession');
-      }
-      setState(() {
-        _audioSessionConfigured = true;
-      });
-    } catch (e) {
-      print('Failed to set up audio session: $e');
-    }
-  }
-
-  void _initAudioMonitoring() {
-    // Detect current device changes
     _subscription = _audioRouter.currentDeviceStream.listen((device) {
-      setState(() {
-        _currentDevice = device;
-      });
+      setState(() => _currentDevice = device);
     });
   }
 
@@ -295,33 +251,18 @@ class _VoIPCallPageState extends State<VoIPCallPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('VoIP Call')),
+      appBar: AppBar(title: Text('Call')),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Show audio session status
-            if (!_audioSessionConfigured)
-              Padding(
-                padding: EdgeInsets.all(16),
-                child: Text(
-                  '⚠️ Setting up audio session...',
-                  style: TextStyle(color: Colors.orange),
-                ),
-              ),
-            // Show current audio output
             Text(
-              'Current output: ${_getDeviceName(_currentDevice?.type)}',
+              'Audio output: ${_deviceName(_currentDevice?.type)}',
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             SizedBox(height: 32),
-            // Audio routing change button
             ElevatedButton.icon(
-              onPressed: _audioSessionConfigured
-                  ? () {
-                      _audioRouter.showAudioRoutePicker(context);
-                    }
-                  : null,  // Disabled before audio session setup
+              onPressed: () => _audioRouter.showAudioRoutePicker(context),
               icon: Icon(Icons.volume_up),
               label: Text('Change Audio Output'),
             ),
@@ -331,19 +272,16 @@ class _VoIPCallPageState extends State<VoIPCallPage> {
     );
   }
 
-  String _getDeviceName(AudioSourceType? type) {
-    if (type == null) return 'Unknown';
+  String _deviceName(AudioSourceType? type) {
     switch (type) {
-      case AudioSourceType.builtinSpeaker:
-        return 'Speaker';
-      case AudioSourceType.builtinReceiver:
-        return 'Receiver';
-      case AudioSourceType.bluetooth:
-        return 'Bluetooth';
-      case AudioSourceType.wiredHeadset:
-        return 'Wired Headset';
-      default:
-        return type.toString();
+      case AudioSourceType.builtinSpeaker: return 'Speaker';
+      case AudioSourceType.builtinReceiver: return 'Phone';
+      case AudioSourceType.bluetooth: return 'Bluetooth';
+      case AudioSourceType.wiredHeadset: return 'Headset';
+      case AudioSourceType.usb: return 'USB';
+      case AudioSourceType.carAudio: return 'Car';
+      case AudioSourceType.airplay: return 'AirPlay';
+      default: return 'Unknown';
     }
   }
 }
@@ -351,188 +289,152 @@ class _VoIPCallPageState extends State<VoIPCallPage> {
 
 ## API Reference
 
-### `AudioRouter` Class
+### AudioRouter
 
-#### `showAudioRoutePicker(BuildContext context, {AndroidAudioOptions? androidOptions})`
+Main class for managing audio routing.
 
-Shows the native audio routing UI.
+#### Methods
 
-- **iOS**: Shows system `AVRoutePickerView`
-- **Android**: Shows Material Design 3 Dialog
+**`showAudioRoutePicker(BuildContext context, {AndroidAudioOptions? androidOptions})`**
 
-**Parameters:**
-- `context`: BuildContext (required)
-- `androidOptions`: Android device filter options (optional, Android only)
+Shows the native audio device picker.
 
 ```dart
-// Basic usage (communication devices only)
+// Basic
 await audioRouter.showAudioRoutePicker(context);
 
-// For media apps (includes A2DP Bluetooth)
+// Android: Show media devices
 await audioRouter.showAudioRoutePicker(
   context,
   androidOptions: AndroidAudioOptions.media(),
 );
 ```
 
-#### `currentDeviceStream`
+#### Properties
 
-Stream that detects changes to the currently selected audio device in real-time.
+**`currentDeviceStream`** → `Stream<AudioDevice?>`
+
+Emits the current audio device whenever it changes.
 
 ```dart
-Stream<AudioDevice?> currentDeviceStream
+audioRouter.currentDeviceStream.listen((device) {
+  print('Device: ${device?.type}');
+});
 ```
 
-### `AudioDevice` Class
+### AudioDevice
 
-Class containing audio device information.
+Represents an audio device.
 
 ```dart
 class AudioDevice {
-  final String id;              // Unique device ID
+  final String id;              // Unique ID
   final AudioSourceType type;   // Device type
-
-  const AudioDevice({
-    required this.id,
-    required this.type,
-  });
 }
 ```
 
-### `AudioSourceType` Enum
+### AudioSourceType
+
+Available device types:
 
 ```dart
 enum AudioSourceType {
-  builtinSpeaker,   // Built-in speaker
-  builtinReceiver,  // Built-in receiver (for calls)
-  bluetooth,        // Bluetooth
-  wiredHeadset,     // Wired headset
+  builtinSpeaker,   // Phone speaker
+  builtinReceiver,  // Phone earpiece
+  bluetooth,        // Bluetooth devices
+  wiredHeadset,     // Wired headphones
   usb,              // USB audio
   carAudio,         // Car audio (iOS only)
   airplay,          // AirPlay (iOS only)
-  unknown,          // Unknown
+  unknown,
 }
 ```
 
-### `AndroidAudioOptions` Class (Android Only)
+### AndroidAudioOptions
 
-Options for filtering audio devices displayed on Android.
-
-```dart
-class AndroidAudioOptions {
-  final AndroidAudioDeviceFilter filter;
-
-  // Constructor
-  const AndroidAudioOptions({
-    this.filter = AndroidAudioDeviceFilter.communication,
-  });
-
-  // Convenience constructors
-  const AndroidAudioOptions.communication(); // For calls (default)
-  const AndroidAudioOptions.media();         // For media
-  const AndroidAudioOptions.all();           // All devices
-}
-```
-
-**AndroidAudioDeviceFilter Options:**
-
-| Filter | Description | Included Devices |
-|--------|-------------|------------------|
-| `communication` | VoIP/calls only (default) | SCO Bluetooth, USB Headset, built-in speaker/receiver, wired headset |
-| `media` | Media playback | A2DP Bluetooth, all USB devices, built-in speaker/receiver, wired headset |
-| `all` | All devices | Same as media (for future expansion) |
-
-**Usage examples:**
+Android device filtering options.
 
 ```dart
-// VoIP app (default)
-await audioRouter.showAudioRoutePicker(context);
+// For VoIP calls (default)
+AndroidAudioOptions.communication()
 
-// Music playback app - includes A2DP Bluetooth
-await audioRouter.showAudioRoutePicker(
-  context,
-  androidOptions: AndroidAudioOptions.media(),
-);
+// For music playback
+AndroidAudioOptions.media()
 
-// Custom filter
-await audioRouter.showAudioRoutePicker(
-  context,
-  androidOptions: AndroidAudioOptions(
-    filter: AndroidAudioDeviceFilter.all,
-  ),
-);
+// All devices
+AndroidAudioOptions.all()
+
+// Custom
+AndroidAudioOptions(filter: AndroidAudioDeviceFilter.media)
 ```
 
-**Ignored on iOS.** iOS automatically filters devices through the system.
+## Supported Devices
 
-## Supported Audio Device Types
+| Device Type | iOS | Android | Notes |
+|-------------|-----|---------|-------|
+| Built-in Speaker | ✅ | ✅ | |
+| Built-in Receiver/Earpiece | ✅ | ✅ | |
+| Bluetooth | ✅ | ✅ | Android: SCO for calls, A2DP for media |
+| Wired Headset | ✅ | ✅ | |
+| USB Headset | ✅ | ⚠️ | Android: Limited support, may not work for calls |
+| Car Audio | ✅ | ❌ | iOS only |
+| AirPlay | ✅ | ❌ | iOS only |
 
-| Type              | Description           | iOS | Android |
-| ----------------- | --------------------- | --- | ------- |
-| `builtinSpeaker`  | Built-in speaker      | ✅  | ✅      |
-| `builtinReceiver` | Built-in receiver     | ✅  | ✅      |
-| `bluetooth`       | Bluetooth audio       | ✅  | ✅      |
-| `wiredHeadset`    | Wired headset/earphones | ✅  | ✅      |
-| `usb`             | USB headset           | ✅  | ⚠️      |
-| `carAudio`        | Car audio             | ✅  | ❌      |
-| `airplay`         | AirPlay devices       | ✅  | ❌      |
+### Android USB Limitations
 
-> **⚠️ Android USB Limitations**:
-> - **Communication filtering**: Only `TYPE_USB_HEADSET` is shown; `TYPE_USB_DEVICE`/`TYPE_USB_ACCESSORY` are automatically excluded.
-> - USB headsets **may not work for VoIP calls** depending on hardware/driver/OEM policies.
-> - Some Android devices (especially Samsung) cannot explicitly select USB with `USAGE_VOICE_COMMUNICATION`.
-> - If USB headset selection fails, an error event will be delivered.
-> - **Recommendation**: Test actual USB call support before relying on it.
+USB headsets have limited support on Android:
+- Only `TYPE_USB_HEADSET` is shown (not general USB devices)
+- May not work for VoIP calls depending on hardware/manufacturer
+- Some devices (especially Samsung) can't use USB for calls
+- If USB fails, you'll get an error event
 
-## Platform-Specific Implementation Details
+**Recommendation:** Don't rely on USB for Android call audio. Wired 3.5mm headsets work fine.
+
+## Platform Implementation Details
 
 ### iOS
+- Uses Apple's native `AVRoutePickerView`
+- System automatically manages device switching
+- Monitors `AVAudioSession.routeChangeNotification`
+- Supports all Apple audio devices
 
-- **Native UI**: System standard picker using `AVRoutePickerView`
-- **Audio routing**: Reads `AVAudioSession.currentRoute` and system manages automatically
-- **Real-time detection**: Detects route changes via `AVAudioSession.routeChangeNotification`
-- **Supported devices**: Built-in speaker/receiver, Bluetooth, wired headset, USB, CarPlay, AirPlay
-- **Audio session management**: This plugin does NOT set AVAudioSession. Host app's responsibility.
-
-### Android
-
-- **Material UI**: Device selection via Material Design 3 Dialog
-- **Audio routing**: Based on `AudioManager.setCommunicationDevice()` (API 29+)
-- **Device list source** (depends on filter):
-  - `communication` filter: Uses `AudioManager.availableCommunicationDevices`
-  - `media`/`all` filter: Uses `AudioManager.getDevices(GET_DEVICES_OUTPUTS)`
-- **Real-time detection**: Detects device connections/disconnections via `AudioDeviceCallback`
-- **Device filtering** (controlled by `AndroidAudioOptions`):
-  - `communication` (default): SCO Bluetooth, USB Headset only (excludes A2DP, general USB)
-  - `media`: Includes A2DP Bluetooth, all USB devices
-  - `all`: Same as media (for future expansion)
-- **Supported devices**:
-  - Communication mode: Built-in speaker/receiver, Bluetooth SCO, wired headset, USB headset (limited)
-  - Media mode: Built-in speaker/receiver, Bluetooth A2DP/SCO, wired headset, all USB devices
-- **Device switching verification**:
-  - Waits 100ms after switching attempt to verify actual change
-  - Sends error event via EventChannel on failure
-  - Provides special error messages for USB devices
-- **Audio mode management**: This plugin does NOT set AudioManager mode. Host app's responsibility.
+### Android (API 29+)
+- Custom Material Design 3 dialog
+- Uses `AudioManager.setCommunicationDevice()` for switching
+- Monitors `AudioDeviceCallback` for device changes
+- **Device Filtering:**
+  - `communication` mode: SCO Bluetooth, USB headsets only
+  - `media` mode: A2DP Bluetooth, all USB devices
+- Verifies device switches (100ms delay to confirm)
+- Special error handling for USB devices
 
 ## Important Notes
 
-1. **🔴 Audio session setup required**: This plugin does NOT set up audio sessions. The host app must first set up the audio session (see [Usage](#usage) above).
-2. **Communication app optimization**: Optimized for communication apps with device filtering. Device list may be limited in media playback apps.
-3. **Context required**: `showAudioRoutePicker()` requires BuildContext.
-4. **iOS limitations**: iOS system automatically manages audio routing, so some device switching may be restricted.
-5. **Android Bluetooth**: Some Bluetooth devices are automatically controlled by the system, so manual switching may be restricted.
-6. **Android USB limitations**:
-   - Only `TYPE_USB_HEADSET` is shown; general USB devices (`USB_DEVICE`/`USB_ACCESSORY`) are automatically filtered.
-   - USB headsets may not work for VoIP calls due to hardware/driver constraints.
-   - Error events are delivered on USB headset selection failure, so the app should handle them appropriately.
-   - Wired headsets (3.5mm) can be manually controlled normally.
-7. **No automatic switching**: Devices are not automatically switched when connected. Users must manually select from the audio device picker UI.
+1. **Audio session setup is required** - The plugin won't work without proper audio session configuration
+2. **Optimized for calls** - Default settings filter devices for communication, not music playback
+3. **BuildContext needed** - Pass a valid context to `showAudioRoutePicker()`
+4. **USB on Android is tricky** - Don't depend on it for VoIP calls
+5. **No auto-switching** - Devices aren't automatically selected when connected; users must choose
 
-## Example
+## Example App
 
-See the [example](./example) directory for a complete example.
+For a complete working example, see the example app in the [GitHub repository](https://github.com/vagabondms/audio_router).
+
+## Troubleshooting
+
+**Audio routing doesn't work**
+- ✅ Did you set up the audio session first?
+- ✅ Is audio mode set to `MODE_IN_COMMUNICATION` (Android) or `.voiceChat` (iOS)?
+
+**Bluetooth device not showing (Android)**
+- ✅ Is Bluetooth connected?
+- ✅ Are you using default `communication` mode? (Only SCO Bluetooth shown, not A2DP music devices)
+- ✅ Try `AndroidAudioOptions.media()` if you need A2DP devices
+
+**USB doesn't work (Android)**
+- ✅ This is expected - USB support for calls is limited on Android
+- ✅ Use wired 3.5mm headsets instead
 
 ## License
 
-This project is distributed under the MIT License. See the [LICENSE](./LICENSE) file for details.
+MIT License - See [LICENSE](./LICENSE) file for details.
