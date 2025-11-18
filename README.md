@@ -299,7 +299,10 @@ Main class for managing audio routing.
 
 **`showAudioRoutePicker(BuildContext context, {AndroidAudioOptions? androidOptions})`**
 
-Shows the native audio device picker.
+Shows the native audio device picker UI only. This method does not perform any automatic toggle logic.
+
+- **iOS**: Displays native AVRoutePickerView
+- **Android**: Shows Material Design 3 dialog with available devices
 
 ```dart
 // Basic
@@ -310,6 +313,35 @@ await audioRouter.showAudioRoutePicker(
   context,
   androidOptions: AndroidAudioOptions.media(),
 );
+```
+
+**`tryChangeAudioRoute(BuildContext context, {AndroidAudioOptions? androidOptions})`**
+
+Tries to change the audio route. Automatically shows picker if external devices are available, otherwise toggles between built-in devices.
+
+- **iOS**: Shows picker if external devices available, otherwise toggles speaker/receiver
+- **Android**: Shows dialog if external devices available, otherwise toggles speaker/receiver
+
+```dart
+// Basic
+await audioRouter.tryChangeAudioRoute(context);
+
+// Android: Show media devices
+await audioRouter.tryChangeAudioRoute(
+  context,
+  androidOptions: AndroidAudioOptions.media(),
+);
+```
+
+**`toggleSpeakerMode()`**
+
+Toggles between built-in speaker and receiver only. Does not show any picker UI.
+
+- **iOS**: Toggles between speaker and receiver
+- **Android**: Toggles between built-in speaker and receiver
+
+```dart
+await audioRouter.toggleSpeakerMode();
 ```
 
 #### Properties

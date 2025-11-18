@@ -80,6 +80,7 @@ class AudioState {
 class AudioRouter {
   /// Shows the audio route picker UI.
   ///
+  /// This method only displays the picker UI without any automatic toggle logic.
   /// - **iOS**: Displays native AVRoutePickerView (system UI)
   /// - **Android**: Shows Material Design 3 dialog with available devices
   ///
@@ -107,17 +108,90 @@ class AudioRouter {
     AndroidAudioOptions? androidOptions,
   }) async {
     if (Platform.isIOS) {
-      await _showIOSAudioRoutePicker();
+      await AudioRouterPlatform.instance.showAudioRoutePicker();
     } else if (Platform.isAndroid) {
-      await _showAndroidAudioRoutePicker(context, androidOptions);
+      await _showAndroidPickerOnly(context, androidOptions);
     }
   }
 
-  /// Shows the audio route picker for iOS.
+  /// Tries to change the audio route.
   ///
-  /// Checks if external devices are available. If available, shows the native
-  /// AVRoutePickerView. Otherwise, toggles between speaker and receiver.
-  Future<void> _showIOSAudioRoutePicker() async {
+  /// Depending on available devices, this method will either:
+  /// - **iOS**: Show native AVRoutePickerView (if external devices available) or toggle between speaker/receiver
+  /// - **Android**: Show Material Design 3 dialog (if external devices available) or toggle between speaker/receiver
+  ///
+  /// **Important**: The audio session must be configured by the host app
+  /// before calling this method. Otherwise, device routing may not work correctly.
+  ///
+  /// [androidOptions] allows you to customize the device filtering on Android.
+  /// By default, only communication devices are shown. For media apps, use
+  /// `AndroidAudioOptions.media()`. This parameter is ignored on iOS.
+  ///
+  /// Example:
+  /// ```dart
+  /// // VoIP/Communication app (default)
+  /// final audioRouter = AudioRouter();
+  /// await audioRouter.tryChangeAudioRoute(context);
+  ///
+  /// // Media playback app (includes A2DP Bluetooth)
+  /// await audioRouter.tryChangeAudioRoute(
+  ///   context,
+  ///   androidOptions: AndroidAudioOptions.media(),
+  /// );
+  /// ```
+  Future<void> tryChangeAudioRoute(
+    BuildContext context, {
+    AndroidAudioOptions? androidOptions,
+  }) async {
+    if (Platform.isIOS) {
+      await _tryChangeIOSAudioRoute();
+    } else if (Platform.isAndroid) {
+      await _tryChangeAndroidAudioRoute(context, androidOptions);
+    }
+  }
+
+  /// Toggles between built-in speaker and receiver.
+  ///
+  /// This method only toggles between built-in devices (speaker and receiver).
+  /// It does not show any picker UI or handle external devices.
+  ///
+  /// - **iOS**: Toggles between speaker and receiver
+  /// - **Android**: Toggles between built-in speaker and receiver
+  ///
+  /// Example:
+  /// ```dart
+  /// final audioRouter = AudioRouter();
+  /// await audioRouter.toggleSpeakerMode();
+  /// ```
+  Future<void> toggleSpeakerMode() async {
+    if (Platform.isIOS) {
+      await AudioRouterPlatform.instance.toggleSpeakerReceiver();
+    } else if (Platform.isAndroid) {
+      await _toggleAndroidBuiltInDevices();
+    }
+  }
+
+  /// Shows the Android picker dialog only (no toggle logic).
+  Future<void> _showAndroidPickerOnly(
+    BuildContext context,
+    AndroidAudioOptions? androidOptions,
+  ) async {
+    if (!context.mounted) return;
+
+    try {
+      final devices = await AudioRouterPlatform.instance.getAvailableDevices(
+        androidAudioOptions: androidOptions ?? const AndroidAudioOptions(),
+      );
+
+      await _showDevicePickerDialog(context, devices);
+    } catch (e) {
+      debugPrint('Failed to show audio route picker: $e');
+      rethrow;
+    }
+  }
+
+  /// Tries to change audio route on iOS (picker or toggle based on external devices).
+  Future<void> _tryChangeIOSAudioRoute() async {
     try {
       final hasExternal =
           await AudioRouterPlatform.instance.hasExternalDevices();
@@ -131,21 +205,18 @@ class AudioRouter {
       }
     } catch (e) {
       // If the initial attempt fails, try fallback to showing picker
-      debugPrint('Failed to show audio route picker: $e');
+      debugPrint('Failed to change audio route: $e');
       try {
         await AudioRouterPlatform.instance.showAudioRoutePicker();
       } catch (fallbackError) {
         // If fallback also fails, log and continue silently
-        debugPrint('Fallback audio route picker also failed: $fallbackError');
+        debugPrint('Fallback audio route change also failed: $fallbackError');
       }
     }
   }
 
-  /// Shows the audio route picker for Android.
-  ///
-  /// If only built-in devices are available, toggles between speaker and receiver.
-  /// Otherwise, shows a Material Design 3 dialog with all available devices.
-  Future<void> _showAndroidAudioRoutePicker(
+  /// Tries to change audio route on Android (dialog or toggle based on available devices).
+  Future<void> _tryChangeAndroidAudioRoute(
     BuildContext context,
     AndroidAudioOptions? androidOptions,
   ) async {
@@ -169,9 +240,9 @@ class AudioRouter {
         await _showDevicePickerDialog(context, devices);
       }
     } catch (e) {
-      // Android route picker is a critical user-facing operation.
+      // Android route change is a critical user-facing operation.
       // Re-throw to allow the caller to handle the error appropriately.
-      debugPrint('Failed to show audio route picker: $e');
+      debugPrint('Failed to change audio route: $e');
       rethrow;
     }
   }
@@ -198,6 +269,17 @@ class AudioRouter {
           : AudioDeviceIds.builtinReceiver;
 
       await AudioRouterPlatform.instance.setAudioDevice(targetDeviceId);
+    }
+  }
+
+  /// Toggles between built-in speaker and receiver on Android.
+  Future<void> _toggleAndroidBuiltInDevices() async {
+    try {
+      final devices = await AudioRouterPlatform.instance.getAvailableDevices();
+      await _toggleBuiltInDevices(devices);
+    } catch (e) {
+      debugPrint('Failed to toggle speaker mode: $e');
+      rethrow;
     }
   }
 
