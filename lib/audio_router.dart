@@ -78,6 +78,42 @@ class AudioState {
 /// **Important**: Before using this class, ensure the host app has configured
 /// the audio session appropriately for your use case.
 class AudioRouter {
+  /// Custom device display names map.
+  ///
+  /// If provided, these names will be used in the Android device picker dialog
+  /// instead of the default names. Keys are [AudioSourceType] and values are
+  /// the display strings.
+  final Map<AudioSourceType, String>? deviceNames;
+
+  /// Custom dialog title.
+  ///
+  /// If provided, this title will be used in the Android device picker dialog
+  /// instead of the default title.
+  final String? dialogTitle;
+
+  /// Creates an [AudioRouter] instance.
+  ///
+  /// [deviceNames] is an optional map of custom device display names.
+  /// If not provided, default English names will be used.
+  ///
+  /// [dialogTitle] is an optional custom dialog title.
+  /// If not provided, default English title will be used.
+  ///
+  /// Example:
+  /// ```dart
+  /// final audioRouter = AudioRouter(
+  ///   deviceNames: {
+  ///     AudioSourceType.builtinSpeaker: 'Speaker',
+  ///     AudioSourceType.builtinReceiver: 'Phone',
+  ///     AudioSourceType.bluetooth: 'Bluetooth',
+  ///   },
+  ///   dialogTitle: 'Select Audio Output',
+  /// );
+  /// ```
+  const AudioRouter({
+    this.deviceNames,
+    this.dialogTitle,
+  });
   /// Shows the audio route picker UI.
   ///
   /// This method only displays the picker UI without any automatic toggle logic.
@@ -299,6 +335,8 @@ class AudioRouter {
       builder: (context) => AudioDevicePickerDialog(
         devices: devices,
         currentDevice: currentDevice,
+        deviceNames: deviceNames,
+        dialogTitle: dialogTitle,
       ),
     );
 
