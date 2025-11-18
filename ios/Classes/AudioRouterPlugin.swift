@@ -85,6 +85,46 @@ private final class AudioRouterController: NSObject {
     NotificationCenter.default.removeObserver(self)
   }
 
+  /// Checks if external devices (Bluetooth, wired headset, etc.) are available
+  func hasExternalDevices() -> Bool {
+    let session = AVAudioSession.sharedInstance()
+    let outputs = session.currentRoute.outputs
+    
+    for output in outputs {
+      let portType = output.portType
+      // Check if it's an external device (not built-in speaker or receiver)
+      if portType != .builtInSpeaker && portType != .builtInReceiver {
+        return true
+      }
+    }
+    return false
+  }
+  
+  /// Toggles between speaker and receiver
+  func toggleSpeakerReceiver() {
+    let session = AVAudioSession.sharedInstance()
+    
+    do {
+      // Get current output port type
+      let currentOutput = session.currentRoute.outputs.first
+      let isCurrentlySpeaker = currentOutput?.portType == .builtInSpeaker
+      
+      // Toggle: if currently speaker, switch to receiver; otherwise switch to speaker
+      if isCurrentlySpeaker {
+        // Switch to receiver (clear override)
+        try session.overrideOutputAudioPort(.none)
+      } else {
+        // Switch to speaker
+        try session.overrideOutputAudioPort(.speaker)
+      }
+      
+      // Notify Flutter of the change
+      sendAudioStateUpdate()
+    } catch {
+      print("Failed to toggle speaker/receiver: \(error)")
+    }
+  }
+
   /// Shows the native iOS audio route picker (AVRoutePickerView).
   /// This allows the user to select between available audio output devices
   /// within the current audio session configured by the host app.
@@ -144,11 +184,13 @@ private final class AudioRouterController: NSObject {
       let portType = currentOutput.portType
 
       if portType == .builtInSpeaker {
+        // Note: This ID must match AudioDeviceIds.builtinSpeaker in Dart
         selectedDeviceMap = AudioDeviceInfo(
           id: "builtin_speaker",
           type: "builtinSpeaker"
         ).toMap()
       } else if portType == .builtInReceiver {
+        // Note: This ID must match AudioDeviceIds.builtinReceiver in Dart
         selectedDeviceMap = AudioDeviceInfo(
           id: "builtin_receiver",
           type: "builtinReceiver"
@@ -247,6 +289,12 @@ public class AudioRouterPlugin: NSObject, FlutterPlugin {
     switch call.method {
     case "showAudioRoutePicker":
       controller.showAudioRoutePicker()
+      result(nil)
+    case "hasExternalDevices":
+      let hasExternal = controller.hasExternalDevices()
+      result(hasExternal)
+    case "toggleSpeakerReceiver":
+      controller.toggleSpeakerReceiver()
       result(nil)
     default:
       result(FlutterMethodNotImplemented)

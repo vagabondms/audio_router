@@ -172,8 +172,9 @@ internal object AudioRouterManager {
       // API 29+: Use setCommunicationDevice() for all device switching
       val availableDevices = audioManager.availableCommunicationDevices
 
+      // Note: These device IDs must match AudioDeviceIds constants in Dart
       when (deviceId) {
-        "builtin_speaker" -> {
+        "builtin_speaker" -> { // AudioDeviceIds.builtinSpeaker
           // Find built-in speaker in available devices
           val speaker = availableDevices.find {
             it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER
@@ -189,7 +190,7 @@ internal object AudioRouterManager {
             Log.e(TAG, "Built-in speaker not found in available devices!")
           }
         }
-        "builtin_receiver" -> {
+        "builtin_receiver" -> { // AudioDeviceIds.builtinReceiver
           Log.d(TAG, "Clearing communication device (receiver)")
           audioManager.clearCommunicationDevice()
         }
@@ -443,6 +444,7 @@ internal object AudioRouterManager {
         AudioDeviceInfo.TYPE_USB_DEVICE,
         AudioDeviceInfo.TYPE_USB_ACCESSORY -> {
           Log.w(TAG, "getCurrentDevice: ignoring non-call device ${getDeviceTypeString(currentDevice.type)}, fallback to receiver")
+          // Note: This ID must match AudioDeviceIds.builtinReceiver in Dart
           return AudioDeviceData(id = "builtin_receiver", type = "builtinReceiver")
         }
         else -> "unknown"
@@ -458,6 +460,7 @@ internal object AudioRouterManager {
 
     // Fallback: No communication device set (means default receiver/earpiece)
     Log.d(TAG, "getCurrentDevice: null (fallback to receiver)")
+    // Note: This ID must match AudioDeviceIds.builtinReceiver in Dart
     return AudioDeviceData(
       id = "builtin_receiver",
       type = "builtinReceiver"

@@ -57,4 +57,14 @@ abstract class AudioRouterPlatform extends PlatformInterface {
   Stream<AudioState> get audioStateStream {
     throw UnimplementedError('audioStateStream has not been implemented.');
   }
+
+  /// Check if external devices are available (iOS only)
+  Future<bool> hasExternalDevices() {
+    throw UnimplementedError('hasExternalDevices() has not been implemented.');
+  }
+
+  /// Toggle between speaker and receiver (iOS only)
+  Future<void> toggleSpeakerReceiver() {
+    throw UnimplementedError('toggleSpeakerReceiver() has not been implemented.');
+  }
 }

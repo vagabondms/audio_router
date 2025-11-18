@@ -1,6 +1,26 @@
 import 'package:flutter/material.dart';
 import 'audio_source.dart';
 
+/// Localized strings for the audio device picker dialog.
+///
+/// These strings are currently hardcoded in Korean. In the future, these can be
+/// replaced with proper internationalization (i18n) support.
+class AudioDevicePickerStrings {
+  /// Dialog title
+  static const String dialogTitle = '오디오 출력';
+
+  /// Device type display names
+  static const String builtinSpeaker = '스피커';
+  static const String builtinReceiver = '휴대폰';
+  static const String bluetooth = 'Bluetooth';
+  static const String wiredHeadset = '이어폰';
+  static const String carAudio = '차량 오디오';
+  static const String airplay = 'AirPlay';
+  static const String unknown = '알 수 없음';
+
+  const AudioDevicePickerStrings._();
+}
+
 /// Material Design 3 오디오 디바이스 선택 다이얼로그
 /// iOS AVRoutePickerView 스타일을 Material로 구현
 class AudioDevicePickerDialog extends StatelessWidget {
@@ -16,7 +36,7 @@ class AudioDevicePickerDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('오디오 출력'),
+      title: const Text(AudioDevicePickerStrings.dialogTitle),
       contentPadding: const EdgeInsets.symmetric(vertical: 8),
       content: SizedBox(
         width: double.maxFinite,
@@ -74,19 +94,19 @@ class AudioDevicePickerDialog extends StatelessWidget {
   String _getDeviceDisplayName(AudioSourceType type) {
     switch (type) {
       case AudioSourceType.builtinSpeaker:
-        return '스피커';
+        return AudioDevicePickerStrings.builtinSpeaker;
       case AudioSourceType.builtinReceiver:
-        return '휴대폰';
+        return AudioDevicePickerStrings.builtinReceiver;
       case AudioSourceType.bluetooth:
-        return 'Bluetooth';
+        return AudioDevicePickerStrings.bluetooth;
       case AudioSourceType.wiredHeadset:
-        return '이어폰';
+        return AudioDevicePickerStrings.wiredHeadset;
       case AudioSourceType.carAudio:
-        return '차량 오디오';
+        return AudioDevicePickerStrings.carAudio;
       case AudioSourceType.airplay:
-        return 'AirPlay';
+        return AudioDevicePickerStrings.airplay;
       case AudioSourceType.unknown:
-        return '알 수 없음';
+        return AudioDevicePickerStrings.unknown;
     }
   }
 }

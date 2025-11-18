@@ -35,31 +35,40 @@ class MethodChannelAudioRouter extends AudioRouterPlatform {
     }
 
     // Parse available devices
-    final List<AudioDevice> availableDevices = [];
-    if (data['availableDevices'] != null) {
-      final devicesData = data['availableDevices'] as List?;
-      if (devicesData != null) {
-        for (final deviceData in devicesData) {
-          if (deviceData is Map) {
-            availableDevices.add(AudioDevice.fromMap(deviceData));
-          }
-        }
-      }
-    }
+    final availableDevices = _parseAvailableDevices(data);
 
     // Parse selected device
-    AudioDevice? selectedDevice;
-    if (data['selectedDevice'] != null) {
-      final deviceData = data['selectedDevice'] as Map?;
-      if (deviceData != null) {
-        selectedDevice = AudioDevice.fromMap(deviceData);
-      }
-    }
+    final selectedDevice = _parseSelectedDevice(data);
 
     return AudioState(
       availableDevices: availableDevices,
       selectedDevice: selectedDevice,
     );
+  }
+
+  /// Parses available devices from the event data.
+  List<AudioDevice> _parseAvailableDevices(Map data) {
+    final devicesData = data['availableDevices'] as List?;
+    if (devicesData == null) {
+      return [];
+    }
+
+    final devices = <AudioDevice>[];
+    for (final deviceData in devicesData) {
+      if (deviceData is Map) {
+        devices.add(AudioDevice.fromMap(deviceData));
+      }
+    }
+    return devices;
+  }
+
+  /// Parses selected device from the event data.
+  AudioDevice? _parseSelectedDevice(Map data) {
+    final deviceData = data['selectedDevice'] as Map?;
+    if (deviceData == null) {
+      return null;
+    }
+    return AudioDevice.fromMap(deviceData);
   }
 
   void _onError(Object error) {
@@ -82,10 +91,9 @@ class MethodChannelAudioRouter extends AudioRouterPlatform {
       );
       if (result == null) return [];
 
-      return result
-          .map((data) => AudioDevice.fromMap(data as Map))
-          .toList();
+      return result.map((data) => AudioDevice.fromMap(data as Map)).toList();
     } catch (e) {
+      // Query operations can fail silently and return empty list
       debugPrint('getAvailableDevices error: $e');
       return [];
     }
@@ -100,6 +108,8 @@ class MethodChannelAudioRouter extends AudioRouterPlatform {
       );
     } catch (e) {
       debugPrint('setAudioDevice error: $e');
+      // Device switching is important, but we don't want to break the app
+      // if it fails. Log the error and continue silently.
     }
   }
 
@@ -110,6 +120,7 @@ class MethodChannelAudioRouter extends AudioRouterPlatform {
       if (result == null) return null;
       return AudioDevice.fromMap(result);
     } catch (e) {
+      // Query operations can fail silently and return null
       debugPrint('getCurrentDevice error: $e');
       return null;
     }
@@ -117,4 +128,28 @@ class MethodChannelAudioRouter extends AudioRouterPlatform {
 
   @override
   Stream<AudioState> get audioStateStream => _audioStateStream;
+
+  @override
+  Future<bool> hasExternalDevices() async {
+    try {
+      final result =
+          await methodChannel.invokeMethod<bool>('hasExternalDevices');
+      return result ?? false;
+    } catch (e) {
+      // Query operations can fail silently and return false
+      debugPrint('hasExternalDevices error: $e');
+      return false;
+    }
+  }
+
+  @override
+  Future<void> toggleSpeakerReceiver() async {
+    try {
+      await methodChannel.invokeMethod<void>('toggleSpeakerReceiver');
+    } catch (e) {
+      // Device switching is important, but we don't want to break the app
+      // if it fails. Log the error and continue silently.
+      debugPrint('toggleSpeakerReceiver error: $e');
+    }
+  }
 }

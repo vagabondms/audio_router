@@ -1,5 +1,19 @@
 import 'package:flutter/foundation.dart';
 
+/// Built-in device ID constants used for communication between Dart and native code.
+///
+/// These constants are used as device IDs for built-in audio devices.
+/// Native code (iOS/Android) should use these same string values.
+class AudioDeviceIds {
+  /// Device ID for built-in speaker
+  static const String builtinSpeaker = 'builtin_speaker';
+
+  /// Device ID for built-in receiver (earpiece)
+  static const String builtinReceiver = 'builtin_receiver';
+
+  const AudioDeviceIds._();
+}
+
 /// Audio output source type
 enum AudioSourceType {
   /// Built-in speaker
