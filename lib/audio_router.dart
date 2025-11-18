@@ -78,42 +78,9 @@ class AudioState {
 /// **Important**: Before using this class, ensure the host app has configured
 /// the audio session appropriately for your use case.
 class AudioRouter {
-  /// Custom device display names map.
-  ///
-  /// If provided, these names will be used in the Android device picker dialog
-  /// instead of the default names. Keys are [AudioSourceType] and values are
-  /// the display strings.
-  final Map<AudioSourceType, String>? deviceNames;
-
-  /// Custom dialog title.
-  ///
-  /// If provided, this title will be used in the Android device picker dialog
-  /// instead of the default title.
-  final String? dialogTitle;
-
   /// Creates an [AudioRouter] instance.
-  ///
-  /// [deviceNames] is an optional map of custom device display names.
-  /// If not provided, default English names will be used.
-  ///
-  /// [dialogTitle] is an optional custom dialog title.
-  /// If not provided, default English title will be used.
-  ///
-  /// Example:
-  /// ```dart
-  /// final audioRouter = AudioRouter(
-  ///   deviceNames: {
-  ///     AudioSourceType.builtinSpeaker: 'Speaker',
-  ///     AudioSourceType.builtinReceiver: 'Phone',
-  ///     AudioSourceType.bluetooth: 'Bluetooth',
-  ///   },
-  ///   dialogTitle: 'Select Audio Output',
-  /// );
-  /// ```
-  const AudioRouter({
-    this.deviceNames,
-    this.dialogTitle,
-  });
+  const AudioRouter();
+
   /// Shows the audio route picker UI.
   ///
   /// This method only displays the picker UI without any automatic toggle logic.
@@ -127,6 +94,12 @@ class AudioRouter {
   /// By default, only communication devices are shown. For media apps, use
   /// `AndroidAudioOptions.media()`. This parameter is ignored on iOS.
   ///
+  /// [deviceNames] is an optional map of custom device display names.
+  /// If not provided, default English names will be used.
+  ///
+  /// [dialogTitle] is an optional custom dialog title.
+  /// If not provided, default English title will be used.
+  ///
   /// Example:
   /// ```dart
   /// // VoIP/Communication app (default)
@@ -138,15 +111,28 @@ class AudioRouter {
   ///   context,
   ///   androidOptions: AndroidAudioOptions.media(),
   /// );
+  ///
+  /// // With custom names and title
+  /// await audioRouter.showAudioRoutePicker(
+  ///   context,
+  ///   deviceNames: {
+  ///     AudioSourceType.builtinSpeaker: 'Speaker',
+  ///     AudioSourceType.builtinReceiver: 'Phone',
+  ///   },
+  ///   dialogTitle: 'Select Audio Output',
+  /// );
   /// ```
   Future<void> showAudioRoutePicker(
     BuildContext context, {
     AndroidAudioOptions? androidOptions,
+    Map<AudioSourceType, String>? deviceNames,
+    String? dialogTitle,
   }) async {
     if (Platform.isIOS) {
       await AudioRouterPlatform.instance.showAudioRoutePicker();
     } else if (Platform.isAndroid) {
-      await _showAndroidPickerOnly(context, androidOptions);
+      await _showAndroidPickerOnly(
+          context, androidOptions, deviceNames, dialogTitle);
     }
   }
 
@@ -163,6 +149,12 @@ class AudioRouter {
   /// By default, only communication devices are shown. For media apps, use
   /// `AndroidAudioOptions.media()`. This parameter is ignored on iOS.
   ///
+  /// [deviceNames] is an optional map of custom device display names.
+  /// If not provided, default English names will be used.
+  ///
+  /// [dialogTitle] is an optional custom dialog title.
+  /// If not provided, default English title will be used.
+  ///
   /// Example:
   /// ```dart
   /// // VoIP/Communication app (default)
@@ -174,15 +166,28 @@ class AudioRouter {
   ///   context,
   ///   androidOptions: AndroidAudioOptions.media(),
   /// );
+  ///
+  /// // With custom names and title
+  /// await audioRouter.tryChangeAudioRoute(
+  ///   context,
+  ///   deviceNames: {
+  ///     AudioSourceType.builtinSpeaker: 'Speaker',
+  ///     AudioSourceType.builtinReceiver: 'Phone',
+  ///   },
+  ///   dialogTitle: 'Select Audio Output',
+  /// );
   /// ```
   Future<void> tryChangeAudioRoute(
     BuildContext context, {
     AndroidAudioOptions? androidOptions,
+    Map<AudioSourceType, String>? deviceNames,
+    String? dialogTitle,
   }) async {
     if (Platform.isIOS) {
       await _tryChangeIOSAudioRoute();
     } else if (Platform.isAndroid) {
-      await _tryChangeAndroidAudioRoute(context, androidOptions);
+      await _tryChangeAndroidAudioRoute(
+          context, androidOptions, deviceNames, dialogTitle);
     }
   }
 
@@ -211,6 +216,8 @@ class AudioRouter {
   Future<void> _showAndroidPickerOnly(
     BuildContext context,
     AndroidAudioOptions? androidOptions,
+    Map<AudioSourceType, String>? deviceNames,
+    String? dialogTitle,
   ) async {
     if (!context.mounted) return;
 
@@ -219,7 +226,7 @@ class AudioRouter {
         androidAudioOptions: androidOptions ?? const AndroidAudioOptions(),
       );
 
-      await _showDevicePickerDialog(context, devices);
+      await _showDevicePickerDialog(context, devices, deviceNames, dialogTitle);
     } catch (e) {
       debugPrint('Failed to show audio route picker: $e');
       rethrow;
@@ -255,6 +262,8 @@ class AudioRouter {
   Future<void> _tryChangeAndroidAudioRoute(
     BuildContext context,
     AndroidAudioOptions? androidOptions,
+    Map<AudioSourceType, String>? deviceNames,
+    String? dialogTitle,
   ) async {
     if (!context.mounted) return;
 
@@ -273,7 +282,8 @@ class AudioRouter {
         await _toggleBuiltInDevices(devices);
       } else {
         // External devices available: show dialog
-        await _showDevicePickerDialog(context, devices);
+        await _showDevicePickerDialog(
+            context, devices, deviceNames, dialogTitle);
       }
     } catch (e) {
       // Android route change is a critical user-facing operation.
@@ -323,6 +333,8 @@ class AudioRouter {
   Future<void> _showDevicePickerDialog(
     BuildContext context,
     List<AudioDevice> devices,
+    Map<AudioSourceType, String>? deviceNames,
+    String? dialogTitle,
   ) async {
     // Get current device
     final currentDevice = await AudioRouterPlatform.instance.getCurrentDevice();
